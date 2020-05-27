@@ -1,2 +1,0 @@
-class ProxyProtocolError(Exception):
-	pass
