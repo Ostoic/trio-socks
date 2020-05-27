@@ -18,8 +18,8 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 class Socks5Stream:
-	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None):
-		self._stream: Optional[trio.SocketStream] = None
+	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None, stream=None):
+		self._stream: Optional[trio.SocketStream] = stream
 		self._proxy = proxy
 		self._username = username
 		self._password = password
@@ -41,16 +41,63 @@ class Socks5Stream:
 
 			if not auth_response.status:
 				raise error.AuthError('Authentication denied')
+
 		elif auth_choice == packets.auth_methods.no_auth:
-			pass
+			await trio.lowlevel.checkpoint()
+
 		else:
 			raise error.AuthError(f'Authentication method not supported: {auth_choice}')
+
+	async def _send_greeting(self, auth_method):
+		greeting = packets.ClientGreeting.build({
+			'auth_methods': [auth_method]
+		})
+
+		await self._stream.send_all(greeting)
+
+	async def _receive_server_choice(self):
+		data = await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
+		return data
+
+	async def _send_connection_request(self, command):
+		address_type = packets.Socks5AddressType.domain_name
+		try:
+			version = ipaddress.ip_address(self._destination[0]).type
+			if version == 6:
+				address_type = packets.Socks5AddressType.ipv6_address
+			elif version == 4:
+				address_type = packets.Socks5AddressType.ipv4_address
+			else:
+				raise ValueError('Invalid address')
+		except:
+			pass
+
+		connection_request = packets.ClientConnectionRequest.build({
+			'command': command,
+			'address': (
+				{'type': address_type, 'address': self._destination[0]},
+				self._destination[1]
+			)
+		})
+
+		await self._stream.send_all(connection_request)
+		log.debug(f'connection request sent: {packets.ClientConnectionRequest.parse(connection_request)}')
+
+	async def _receive_connection_response(self) -> packets.ServerConnectionResponse:
+		data = await self._stream.receive_some()
+		connection_response = packets.ServerConnectionResponse.parse(data)
+
+		if connection_response.status != packets.ServerAuthStatus.request_granted:
+			raise error.ProtocolError(f'Server denied connection request: {connection_response.status}')
+
+		self._negotiated.set()
+		return connection_response
 
 	async def _negotiate_connection(self, command: packets.Socks5Command, address: Tuple[str, int]):
 		"""
 		Perform the command in association with the address through the established proxy server connection
 		:param command: the Socks5 command to execute
-		:param destination: the destination
+		:param address: the address
 		:return:
 		"""
 		auth_method = packets.auth_methods.username_password if self._username and self._password \
@@ -59,63 +106,29 @@ class Socks5Stream:
 		log.debug(f'{auth_method=}')
 
 		try:
-			greeting = packets.ClientGreeting.build({
-				'auth_methods': [auth_method]
-			})
+			await self._send_greeting(auth_method)
+			auth_choice = (await self._receive_server_choice()).auth_choice
 
-			await self._stream.send_all(greeting)
-
-			data = await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
-			auth_choice = packets.ServerChoice.parse(data).auth_choice
 			await self._authenticate(auth_choice)
-
 			log.debug('authenticated')
-			address_type = packets.Socks5AddressType.domain_name
-			try:
-				version = ipaddress.ip_address(self._destination[0]).type
-				if version == 6:
-					address_type = packets.Socks5AddressType.ipv6_address
-				elif version == 4:
-					address_type = packets.Socks5AddressType.ipv4_address
-				else:
-					raise ValueError('Invalid address')
-			except:
-				pass
 
-			connection_request = packets.ClientConnectionRequest.build({
-				'command': command,
-				'address': (
-					{'type': address_type, 'address': self._destination[0]},
-					self._destination[1]
-				)
-			})
-
-			await self._stream.send_all(connection_request)
-			log.debug(f'connection request sent: {packets.ClientConnectionRequest.parse(connection_request)}')
-
-			data = await self._stream.receive_some()
-			connection_response = packets.ServerConnectionResponse.parse(data)
-
-			if connection_response.status != packets.ServerAuthStatus.request_granted:
-				raise error.ProtocolError(f'Server denied connection request: {connection_response.status}')
-
-			# (address, port) = connection_response.server_bind_address.address
+			await self._send_connection_request(command)
+			connection_response = await self._receive_connection_response()
 			log.debug(connection_response.server_bind_address)
-			self._negotiated.set()
 
 		except (construct.StreamError, construct.ConstError) as e:
 			raise error.ProtocolError(e)
 
-	async def _ensure_negotiated(self):
+	async def _ensure_negotiated(self, command: packets.Socks5Command=packets.Socks5Command.tcp_connect):
 		if self._stream is None:
 			log.debug('connecting to proxy')
 			self._stream = await trio.open_tcp_stream(*self._proxy)
 			log.debug('connected to proxy')
 
 		if not self._negotiated.is_set():
-			log.debug(f'negotiating connection to: {self._destination}')
-			await self._negotiate_connection(packets.Socks5Command.tcp_connect, self._destination)
-			log.debug(f'negotiated connection to: {self._destination}')
+			log.debug(f'negotiating {command} to: {self._destination}')
+			await self._negotiate_connection(command, self._destination)
+			log.debug(f'negotiated {command} to: {self._destination}')
 
 	async def receive_some(self, max_bytes=None):
 		await self._ensure_negotiated()

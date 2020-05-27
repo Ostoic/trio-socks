@@ -20,23 +20,23 @@ AuthMethod = construct.Enum(construct.Byte,
 auth_methods = AuthMethod
 
 ClientGreeting = construct.Struct(
-	'version' / construct.Const(5, construct.Byte),
+	'version' / construct.Default(construct.Const(5, construct.Byte), 5),
 	'auth_methods' / construct.PrefixedArray(construct.Byte, AuthMethod)
 )
 
 ServerChoice = construct.Struct(
-	'version' / construct.Const(5, construct.Byte),
+	'version' / construct.Default(construct.Const(5, construct.Byte), 5),
 	'auth_choice' / AuthMethod
 )
 
 ClientAuthRequest = construct.Struct(
-	'version' / construct.Byte,
-	'username' / construct.PascalString(construct.Byte, 'ascii'),
-	'password' / construct.PascalString(construct.Byte, 'ascii'),
+	'version' / construct.Default(construct.Byte, 1),
+	'username' / construct.PascalString(construct.Byte, 'utf-8'),
+	'password' / construct.PascalString(construct.Byte, 'utf-8'),
 )
 
 ServerAuthResponse = construct.Struct(
-	'version' / construct.Byte,
+	'version' / construct.Default(construct.Byte, 1),
 	'status' / construct.Flag,
 )
 
@@ -51,7 +51,7 @@ Socks5Address = construct.Struct(
 	'type' / Socks5AddressType,
 	'address' / construct.Switch(construct.this.type, {
 		Socks5AddressType.ipv4_address: IPv4Address,
-		Socks5AddressType.domain_name: construct.PascalString(construct.Byte, 'ascii'),
+		Socks5AddressType.domain_name: construct.PascalString(construct.Byte, 'utf-8'),
 		Socks5AddressType.ipv6_address: IPv6Address,
 	})
 )
@@ -82,8 +82,8 @@ ServerAuthStatus = construct.Enum(construct.Byte,
 )
 
 ServerConnectionResponse = construct.Struct(
-	'version' / construct.Const(5, construct.Byte),
+	'version' / construct.Default(construct.Const(5, construct.Byte), 5),
 	'status' / ServerAuthStatus,
-	'reserved' / construct.Const(0, construct.Byte),
+	'reserved' / construct.Default(construct.Const(0, construct.Byte), 0),
 	'server_bind_address' / construct.Sequence(Socks5Address, construct.Short),
 )
