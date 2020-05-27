@@ -3,7 +3,7 @@ import ipaddress
 
 IPv4Address = construct.ExprAdapter(construct.RawCopy(construct.Byte[4]),
 	decoder=lambda obj, ctx: ipaddress.IPv4Address(obj.data),
-	encoder=lambda obj, ctx: ipaddress.IPv4Address(obj.data).packed,
+	encoder=lambda obj, ctx: ipaddress.IPv4Address(obj).packed,
 )
 
 IPv6Address = construct.ExprAdapter(construct.RawCopy(construct.Byte[16]),
@@ -66,7 +66,7 @@ ClientConnectionRequest = construct.Struct(
 	'version' / construct.Default(construct.Const(5, construct.Byte), 5),
 	'command' / Socks5Command,
 	'reserved' / construct.Default(construct.Const(0, construct.Byte), 0),
-	'destination' / construct.Sequence(Socks5Address, construct.Short),
+	'address' / construct.Sequence(Socks5Address, construct.Short),
 )
 
 ServerAuthStatus = construct.Enum(construct.Byte,
@@ -85,6 +85,5 @@ ServerConnectionResponse = construct.Struct(
 	'version' / construct.Const(5, construct.Byte),
 	'status' / ServerAuthStatus,
 	'reserved' / construct.Const(0, construct.Byte),
-	'server_bind_address' / Socks5Address,
-	'serer_bind_port' / construct.Short
+	'server_bind_address' / construct.Sequence(Socks5Address, construct.Short),
 )
