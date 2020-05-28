@@ -48,6 +48,7 @@ async def test_protocol_auth():
 				data = await server_stream.receive_some()
 				auth_request = socks5.packets.ClientAuthRequest.parse(data)
 				print('server received auth request')
+				print(f'user: {auth_request.username}')
 				assert auth_request.username == 'user'
 				assert auth_request.password == 'pass'
 
@@ -81,6 +82,7 @@ async def test_protocol_auth():
 	async with trio.open_nursery() as nursery:
 		nursery.start_soon(server, server_stream)
 		nursery.start_soon(client, client_stream)
+
 
 async def test_protocol_noauth():
 	async def client(client_stream):
@@ -127,7 +129,6 @@ async def test_protocol_noauth():
 				connection_request = socks5.packets.ClientConnectionRequest.parse(data)
 
 				assert connection_request.command == socks5.packets.Socks5Command.tcp_connect
-				# assert connection_request.address == ({'type':socks5.packets.Socks5AddressType.domain_name,'address':'api.ipify.org'}, 80)
 
 				connection_response = socks5.packets.ServerConnectionResponse.build({
 					'status': socks5.packets.ServerAuthStatus.request_granted,

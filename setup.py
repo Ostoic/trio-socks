@@ -8,5 +8,5 @@ setup(
 	license='MIT',
 	author='Shaun Ostoic',
 	author_email='ostoic@uwindsor.ca',
-	description='trio-socks provides a HalfCloseableStream for use with the trio async library'
+	description='trio-socks provides a trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server'
 )
