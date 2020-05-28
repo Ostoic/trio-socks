@@ -107,7 +107,8 @@ class Socks5Stream:
 
 		try:
 			await self._send_greeting(auth_method)
-			auth_choice = (await self._receive_server_choice()).auth_choice
+			data = await self._receive_server_choice()
+			auth_choice = packets.ServerChoice.parse(data).auth_choice
 
 			await self._authenticate(auth_choice)
 			log.debug('authenticated')
