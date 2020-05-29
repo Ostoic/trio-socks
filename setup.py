@@ -14,9 +14,11 @@ setup(
 	classifiers=[
 		'Development Status :: 3 - Alpha',
 		'Intended Audience :: Developers',  # Define that your audience are developers
-		'Topic :: Software Development :: Build Tools',
 		'License :: OSI Approved :: MIT License',  # Again, pick a license
 		'Programming Language :: Python :: 3',  # Specify which pyhton versions that you want to support
 		'Programming Language :: Python :: 3.6',
+		'Topic :: Software Development :: Libraries',
+		'Framework :: Trio',
+		'Topic :: System :: Networking',
 	],
 )
