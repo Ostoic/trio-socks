@@ -1,4 +1,3 @@
-import sys
 import construct
 import trio
 import ipaddress
