@@ -7,16 +7,6 @@ from typing import Tuple, Optional
 from . import packets
 from . import error
 
-import logging
-logging.basicConfig(
-	level=logging.DEBUG,
-	stream=sys.stdout,
-	format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
-	datefmt='%H:%M:%S',
-)
-log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
-
 class Socks5Stream:
 	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None, stream=None):
 		self._stream: Optional[trio.SocketStream] = stream
@@ -27,7 +17,6 @@ class Socks5Stream:
 		self._negotiated = trio.Event()
 
 	async def _authenticate(self, auth_choice):
-		log.debug(f'authenticating via {auth_choice}')
 		if auth_choice == packets.auth_methods.username_password:
 			auth_request = packets.ClientAuthRequest.build({
 				'username': self._username,
@@ -81,7 +70,6 @@ class Socks5Stream:
 		})
 
 		await self._stream.send_all(connection_request)
-		log.debug(f'connection request sent: {packets.ClientConnectionRequest.parse(connection_request)}')
 
 	async def _receive_connection_response(self) -> packets.ServerConnectionResponse:
 		data = await self._stream.receive_some()
@@ -103,33 +91,29 @@ class Socks5Stream:
 		auth_method = packets.auth_methods.username_password if self._username and self._password \
 			else packets.auth_methods.no_auth
 
-		log.debug(f'{auth_method=}')
-
 		try:
 			await self._send_greeting(auth_method)
 			data = await self._receive_server_choice()
 			auth_choice = packets.ServerChoice.parse(data).auth_choice
 
 			await self._authenticate(auth_choice)
-			log.debug('authenticated')
 
 			await self._send_connection_request(command)
 			connection_response = await self._receive_connection_response()
-			log.debug(connection_response.server_bind_address)
 
 		except (construct.StreamError, construct.ConstError) as e:
 			raise error.ProtocolError(e)
 
 	async def _ensure_negotiated(self, command: packets.Socks5Command=packets.Socks5Command.tcp_connect):
 		if self._stream is None:
-			log.debug('connecting to proxy')
 			self._stream = await trio.open_tcp_stream(*self._proxy)
-			log.debug('connected to proxy')
 
 		if not self._negotiated.is_set():
-			log.debug(f'negotiating {command} to: {self._destination}')
 			await self._negotiate_connection(command, self._destination)
-			log.debug(f'negotiated {command} to: {self._destination}')
+
+	@property
+	def socket(self):
+		return self._stream.socket
 
 	async def receive_some(self, max_bytes=None):
 		await self._ensure_negotiated()
@@ -150,7 +134,6 @@ class Socks5Stream:
 		return await self._stream.send_eof()
 
 	async def aclose(self):
-		log.debug('aclose')
 		self._negotiated = trio.Event()
 		await self._stream.aclose()
 		self._stream = None
