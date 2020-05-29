@@ -4,6 +4,7 @@ setup(
 	name='trio-socks',
 	version='0.1.0',
 	packages=['trio_socks', 'trio_socks.socks5'],
+	install_requires=['trio', 'construct', 'ipaddress'],
 	url='https://github.com/Ostoic/trio-socks',
 	license='MIT',
 	author='Shaun Ostoic',
