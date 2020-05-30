@@ -2,7 +2,7 @@ import construct
 import trio
 import ipaddress
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Iterable
 from . import packets
 from . import error
 
@@ -14,6 +14,13 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		self._password = password
 		self._destination = destination
 		self._negotiated = trio.Event()
+
+	async def __aenter__(self):
+		return self
+
+	async def __aexit__(self, exc_type, exc_val, exc_tb):
+		if self._stream is not None:
+			await self.aclose()
 
 	async def _authenticate(self, auth_choice):
 		if auth_choice == packets.auth_methods.username_password:
@@ -36,9 +43,9 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		else:
 			raise error.AuthError(f'Authentication method not supported: {auth_choice}')
 
-	async def _send_greeting(self, auth_method):
+	async def _send_greeting(self, auth_methods: Iterable):
 		greeting = packets.ClientGreeting.build({
-			'auth_methods': [auth_method]
+			'auth_methods': auth_methods
 		})
 
 		await self._stream.send_all(greeting)
@@ -87,18 +94,18 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		:param address: the address
 		:return:
 		"""
-		auth_method = packets.auth_methods.username_password if self._username and self._password \
-			else packets.auth_methods.no_auth
+		auth_methods = [packets.auth_methods.username_password, packets.auth_methods.no_auth] if self._username and self._password \
+			else [packets.auth_methods.no_auth]
 
 		try:
-			await self._send_greeting(auth_method)
+			await self._send_greeting(auth_methods)
 			data = await self._receive_server_choice()
 			auth_choice = packets.ServerChoice.parse(data).auth_choice
 
 			await self._authenticate(auth_choice)
 
 			await self._send_connection_request(command)
-			connection_response = await self._receive_connection_response()
+			await self._receive_connection_response()
 
 		except (construct.StreamError, construct.ConstError) as e:
 			raise error.ProtocolError(e)
@@ -109,17 +116,6 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 
 		if not self._negotiated.is_set():
 			await self._negotiate_connection(command, self._destination)
-
-	async def __aenter__(self):
-		return self
-
-	async def __aexit__(self, exc_type, exc_val, exc_tb):
-		if self._stream is not None:
-			await self._stream.aclose()
-
-	@property
-	def socket(self):
-		return self._stream.socket
 
 	async def receive_some(self, max_bytes=None):
 		await self._ensure_negotiated()
