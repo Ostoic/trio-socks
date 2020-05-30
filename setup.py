@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name='trio-socks',
-	version='0.1.0',
+	version='0.1.0-1',
 	packages=['trio_socks', 'trio_socks.socks5'],
 	install_requires=['trio', 'construct', 'ipaddress'],
 	url='https://github.com/Ostoic/trio-socks',
@@ -10,7 +10,7 @@ setup(
 	author='Shaun Ostoic',
 	author_email='shaun.ostoic@gmail.ca',
 	keywords=['socks5', 'trio-socks', 'trio'],
-	download_url='https://github.com/Ostoic/trio-socks/archive/v0.1.0.tar.gz',
+	download_url='https://github.com/Ostoic/trio-socks/archive/v0.1.0-1.tar.gz',
 	description='trio-socks provides a trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server',
 	classifiers=[
 		'Development Status :: 3 - Alpha',
