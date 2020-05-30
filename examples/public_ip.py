@@ -9,7 +9,7 @@ async def parse_public_ip(stream):
 	print(f'{my_ip=}')
 
 async def print_public_ip():
-	async with socks5.make_tcp_stream(destination=('api.ipify.org', 80), proxy=('10.179.205.114', 1664)) as stream:
+	async with socks5.Socks5Stream(destination=('api.ipify.org', 80), proxy=('10.179.205.114', 1664)) as stream:
 		await parse_public_ip(stream)
 
 	async with await trio.open_tcp_stream('api.ipify.org', 80) as stream:

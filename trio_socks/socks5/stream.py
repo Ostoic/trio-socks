@@ -6,9 +6,9 @@ from typing import Tuple, Optional
 from . import packets
 from . import error
 
-class Socks5Stream:
+class Socks5Stream(trio.abc.HalfCloseableStream):
 	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None, stream=None):
-		self._stream: Optional[trio.SocketStream] = stream
+		self._stream: Optional[trio.abc.HalfCloseableStream] = stream
 		self._proxy = proxy
 		self._username = username
 		self._password = password
@@ -44,20 +44,20 @@ class Socks5Stream:
 		await self._stream.send_all(greeting)
 
 	async def _receive_server_choice(self):
-		data = await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
-		return data
+		return await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
 
 	async def _send_connection_request(self, command):
 		address_type = packets.Socks5AddressType.domain_name
+
 		try:
 			version = ipaddress.ip_address(self._destination[0]).type
+
 			if version == 6:
 				address_type = packets.Socks5AddressType.ipv6_address
 			elif version == 4:
 				address_type = packets.Socks5AddressType.ipv4_address
-			else:
-				raise ValueError('Invalid address')
-		except:
+
+		except ValueError as e:
 			pass
 
 		connection_request = packets.ClientConnectionRequest.build({
@@ -109,6 +109,13 @@ class Socks5Stream:
 
 		if not self._negotiated.is_set():
 			await self._negotiate_connection(command, self._destination)
+
+	async def __aenter__(self):
+		return self
+
+	async def __aexit__(self, exc_type, exc_val, exc_tb):
+		if self._stream is not None:
+			await self._stream.aclose()
 
 	@property
 	def socket(self):
