@@ -7,15 +7,19 @@ from . import packets
 from . import error
 
 class Socks5Stream(trio.abc.HalfCloseableStream):
-	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None, stream=None):
+	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None, stream=None, negotiate=False):
 		self._stream: Optional[trio.abc.HalfCloseableStream] = stream
 		self._proxy = proxy
 		self._username = username
 		self._password = password
 		self._destination = destination
 		self._negotiated = trio.Event()
+		self._init_negotiate = bool(negotiate)
 
 	async def __aenter__(self):
+		if self._init_negotiate:
+			await self.negotiate()
+
 		return self
 
 	async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -116,6 +120,12 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 
 		if not self._negotiated.is_set():
 			await self._negotiate_connection(command, self._destination)
+
+	async def negotiate(self):
+		if self._stream is None or not self._negotiated.is_set():
+			await self._ensure_negotiated()
+
+		await trio.lowlevel.checkpoint()
 
 	async def receive_some(self, max_bytes=None):
 		await self._ensure_negotiated()
