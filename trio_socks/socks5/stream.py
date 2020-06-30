@@ -33,6 +33,7 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		self._destination = destination
 		self._negotiated = trio.Event()
 		self._init_negotiate = bool(negotiate)
+		self._local_addr = '?'
 
 	async def __aenter__(self):
 		if self._init_negotiate:
@@ -51,11 +52,11 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 				'password': self._password
 			})
 
-			log.debug(f'Sending auth request: {packets.ClientAuthRequest.parse(auth_request)}')
+			log.debug(f'[{self._local_addr} -> {self._proxy[0]}] Sending auth request: {packets.ClientAuthRequest.parse(auth_request)}')
 			await self._stream.send_all(auth_request)
 
 			data = await self._stream.receive_some(max_bytes=packets.ServerAuthResponse.sizeof())
-			log.debug(f'Received packet: {data}')
+			log.debug(f'[{self._local_addr} <- {self._proxy[0]}] Received packet: {data}')
 
 			auth_response = packets.ServerAuthResponse.parse(data)
 			log.debug(f'packet is auth response: {auth_response}')
@@ -74,12 +75,12 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 			'auth_methods': auth_methods
 		})
 
-		log.debug(f'Sending client greeting: {packets.ClientGreeting.parse(greeting)}')
+		log.debug(f'[{self._local_addr} -> {self._proxy[0]}] Sending client greeting: {packets.ClientGreeting.parse(greeting)}')
 		await self._stream.send_all(greeting)
 
 	async def _receive_server_choice(self):
 		data = await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
-		log.debug(f'Received packet: {data}')
+		log.debug(f'[{self._local_addr} <- {self._proxy[0]}] Received packet: {data}')
 		return data
 
 	async def _send_connection_request(self, command, address: Tuple[str, int]):
@@ -94,12 +95,12 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 			)
 		})
 
-		log.debug(f'Sending client connection request: {packets.ClientConnectionRequest.parse(connection_request)}')
+		log.debug(f'[{self._local_addr} -> {self._proxy[0]}] Sending client connection request: {packets.ClientConnectionRequest.parse(connection_request)}')
 		await self._stream.send_all(connection_request)
 
 	async def _receive_connection_response(self) -> packets.ServerConnectionResponse:
 		data = await self._stream.receive_some()
-		log.debug(f'Received packet: {data}')
+		log.debug(f'[{self._local_addr} <- {self._proxy[0]}] Received packet: {data}')
 		connection_response = packets.ServerConnectionResponse.parse(data)
 		log.debug(f'packet is connection response: {connection_response}')
 
@@ -136,6 +137,7 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 	async def _ensure_negotiated(self, command: packets.Socks5Command=packets.Socks5Command.tcp_connect):
 		if self._stream is None:
 			self._stream = await trio.open_tcp_stream(*self._proxy)
+			self._local_addr = trio.socket.gethostname()
 
 		if not self._negotiated.is_set():
 			await self._negotiate_connection(command, self._destination)
@@ -148,11 +150,15 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 
 	async def receive_some(self, max_bytes=None):
 		await self._ensure_negotiated()
-		return await self._stream.receive_some(max_bytes=max_bytes)
+		data = await self._stream.receive_some(max_bytes=max_bytes)
+		log.debug(f'[{self._local_addr} <- {self._proxy[0]} <- {self._destination[0]}] received: {data}')
+		return data
 
 	async def send_all(self, data):
 		await self._ensure_negotiated()
-		return await self._stream.send_all(data)
+		await self._stream.send_all(data)
+		log.debug(f'[{self._local_addr} -> {self._proxy[0]} -> {self._destination[0]}] sent: {data}')
+
 
 	async def wait_send_all_might_not_block(self):
 		await self._ensure_negotiated()
@@ -160,7 +166,7 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 
 	async def send_eof(self):
 		if not self._negotiated.is_set():
-			raise error.ProtocolError('Negotiation not yet had')
+			raise error.ProtocolError('Negotiation not yet completed')
 
 		return await self._stream.send_eof()
 

@@ -6,7 +6,7 @@ def load_readme():
 
 setup(
 	name='trio-socks',
-	version='0.1.1-3',
+	version='0.1.1-4',
 	packages=['trio_socks', 'trio_socks.socks5'],
 	install_requires=['trio', 'construct', 'ipaddress'],
 	url='https://github.com/Ostoic/trio-socks',
@@ -14,7 +14,7 @@ setup(
 	author='Shaun Ostoic',
 	author_email='shaun.ostoic@gmail.com',
 	keywords=['socks5', 'trio-socks', 'trio'],
-	download_url='https://github.com/Ostoic/trio-socks/archive/v0.1.1-3.tar.gz',
+	download_url='https://github.com/Ostoic/trio-socks/archive/v0.1.1-4.tar.gz',
 	description='trio-socks provides a trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server',
 	long_description=load_readme(),
 	long_description_content_type='text/markdown',
