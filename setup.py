@@ -6,7 +6,7 @@ def load_readme():
 
 setup(
 	name='trio-socks',
-	version='0.1.1',
+	version='0.1.1-2',
 	packages=['trio_socks', 'trio_socks.socks5'],
 	install_requires=['trio', 'construct', 'ipaddress'],
 	url='https://github.com/Ostoic/trio-socks',
