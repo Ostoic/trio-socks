@@ -61,14 +61,15 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		address_type = packets.Socks5AddressType.domain_name
 
 		try:
-			version = ipaddress.ip_address(self._destination[0]).type
-
-			if version == 6:
+			version = ipaddress.ip_address(self._destination[0])
+			if isinstance(version,  ipaddress.IPv4Address):
 				address_type = packets.Socks5AddressType.ipv6_address
-			elif version == 4:
+
+			elif isinstance(version,  ipaddress.IPv6Address):
 				address_type = packets.Socks5AddressType.ipv4_address
 
-		except ValueError as e:
+		# On exception we assume the address is a domain name
+		except ValueError:
 			pass
 
 		connection_request = packets.ClientConnectionRequest.build({
