@@ -25,7 +25,7 @@ async def run(client_stream, username=None, password=None):
 	await stream._authenticate(auth_choice)
 
 	print('client connection request sending')
-	await stream._send_connection_request(socks5.packets.Socks5Command.tcp_connect)
+	await stream._send_connection_request(socks5.packets.Socks5Command.tcp_connect, stream._destination)
 	print('client connection request sent')
 
 	await stream._receive_connection_response()

@@ -5,6 +5,24 @@ import ipaddress
 from typing import Tuple, Optional, Iterable
 from . import packets
 from . import error
+from .. import log
+log = log.get_logger(__name__)
+
+def _determine_address_type(address):
+	try:
+		version = ipaddress.ip_address(address)
+		log.debug(f'{type(version)=}')
+		if type(version) is ipaddress.IPv4Address:
+			return packets.Socks5AddressType.ipv4_address
+
+		elif type(version) is ipaddress.IPv6Address:
+			return packets.Socks5AddressType.ipv6_address
+
+	# On exception we assume the address is a domain name
+	except (ValueError, TypeError):
+		pass
+
+	return packets.Socks5AddressType.domain_name
 
 class Socks5Stream(trio.abc.HalfCloseableStream):
 	def __init__(self, destination: Tuple[str, int], proxy: Tuple[str, int]=None, username=None, password=None, stream=None, negotiate=False):
@@ -33,10 +51,14 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 				'password': self._password
 			})
 
+			log.debug(f'Sending auth request: {packets.ClientAuthRequest.parse(auth_request)}')
 			await self._stream.send_all(auth_request)
 
 			data = await self._stream.receive_some(max_bytes=packets.ServerAuthResponse.sizeof())
+			log.debug(f'Received packet: {data}')
+
 			auth_response = packets.ServerAuthResponse.parse(data)
+			log.debug(f'packet is auth response: {auth_response}')
 
 			if not auth_response.status:
 				raise error.AuthError('Authentication denied')
@@ -52,39 +74,34 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 			'auth_methods': auth_methods
 		})
 
+		log.debug(f'Sending client greeting: {packets.ClientGreeting.parse(greeting)}')
 		await self._stream.send_all(greeting)
 
 	async def _receive_server_choice(self):
-		return await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
+		data = await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
+		log.debug(f'Received packet: {data}')
+		return data
 
-	async def _send_connection_request(self, command):
-		address_type = packets.Socks5AddressType.domain_name
-
-		try:
-			version = ipaddress.ip_address(self._destination[0])
-			if isinstance(version,  ipaddress.IPv4Address):
-				address_type = packets.Socks5AddressType.ipv6_address
-
-			elif isinstance(version,  ipaddress.IPv6Address):
-				address_type = packets.Socks5AddressType.ipv4_address
-
-		# On exception we assume the address is a domain name
-		except ValueError:
-			pass
+	async def _send_connection_request(self, command, address: Tuple[str, int]):
+		log.debug(f'[_send_connection_request] {command=}, {address=}')
+		address_type = _determine_address_type(address[0])
 
 		connection_request = packets.ClientConnectionRequest.build({
 			'command': command,
 			'address': (
-				{'type': address_type, 'address': self._destination[0]},
-				self._destination[1]
+				{'type': address_type, 'address': address[0]},
+				address[1]
 			)
 		})
 
+		log.debug(f'Sending client connection request: {packets.ClientConnectionRequest.parse(connection_request)}')
 		await self._stream.send_all(connection_request)
 
 	async def _receive_connection_response(self) -> packets.ServerConnectionResponse:
 		data = await self._stream.receive_some()
+		log.debug(f'Received packet: {data}')
 		connection_response = packets.ServerConnectionResponse.parse(data)
+		log.debug(f'packet is connection response: {connection_response}')
 
 		if connection_response.status != packets.ServerAuthStatus.request_granted:
 			raise error.ProtocolError(f'Server denied connection request: {connection_response.status}')
@@ -92,11 +109,11 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		self._negotiated.set()
 		return connection_response
 
-	async def _negotiate_connection(self, command: packets.Socks5Command, address: Tuple[str, int]):
+	async def _negotiate_connection(self, command: packets.Socks5Command, destination: Tuple[str, int]):
 		"""
 		Perform the command in association with the address through the established proxy server connection
 		:param command: the Socks5 command to execute
-		:param address: the address
+		:param destination: the address
 		:return:
 		"""
 		auth_methods = [packets.auth_methods.username_password, packets.auth_methods.no_auth] if self._username and self._password \
@@ -105,11 +122,12 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		try:
 			await self._send_greeting(auth_methods)
 			data = await self._receive_server_choice()
-			auth_choice = packets.ServerChoice.parse(data).auth_choice
+			packet = packets.ServerChoice.parse(data)
+			auth_choice = packet.auth_choice
+			log.debug(f'packet is server choice: {packet}')
 
 			await self._authenticate(auth_choice)
-
-			await self._send_connection_request(command)
+			await self._send_connection_request(command, destination)
 			await self._receive_connection_response()
 
 		except (construct.StreamError, construct.ConstError) as e:

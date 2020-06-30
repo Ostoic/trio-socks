@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import trio
 import tests
 from trio_socks import socks5
@@ -23,7 +25,6 @@ async def test_protocol_noauth():
 	assert not cancel_scope.cancel_called
 
 async def test_interface():
-	from uuid import uuid4
 	key = str(uuid4())
 	async def server_receive_once(stream):
 		data = await stream.receive_some()

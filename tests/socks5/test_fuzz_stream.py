@@ -1,5 +1,4 @@
 import trio
-import tests
 
 async def test_fuzz_client():
 	(client_stream, server_stream) = trio.testing.memory_stream_pair()
