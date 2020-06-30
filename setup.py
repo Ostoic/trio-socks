@@ -14,7 +14,7 @@ setup(
 	author='Shaun Ostoic',
 	author_email='shaun.ostoic@gmail.com',
 	keywords=['socks5', 'trio-socks', 'trio'],
-	download_url='https://github.com/Ostoic/trio-socks/archive/v0.1.1-1.tar.gz',
+	download_url='https://github.com/Ostoic/trio-socks/archive/v0.1.1-2.tar.gz',
 	description='trio-socks provides a trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server',
 	long_description=load_readme(),
 	long_description_content_type='text/markdown',
