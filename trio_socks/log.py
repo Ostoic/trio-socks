@@ -1,14 +1,22 @@
 import logging
 import sys
 
-def set_level(level):
-	logging.basicConfig(
-		level=level,
-		stream=sys.stdout,
-		format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
-		datefmt='%H:%M:%S',
-	)
+logging.basicConfig(
+	level=logging.DEBUG,
+	stream=sys.stdout,
+	format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
+	datefmt='%H:%M:%S',
+)
 
-set_level(logging.INFO)
+loggers = {}
+
+def set_level(level):
+	for name, logger in loggers.items():
+		logger.setLevel(level)
+
 def get_logger(name: str) -> logging.Logger:
-	return logging.getLogger(name)
+	if name not in loggers:
+		loggers[name] = logging.getLogger(name)
+
+	return loggers[name]
+
