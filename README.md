@@ -1,4 +1,7 @@
 # trio-socks
+[![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/tterb/atomic-design-ui/blob/master/LICENSEs)
+[![PyPi Version](https://img.shields.io/pypi/v/trio-socks.svg)](https://pypi.python.org/pypi/trio-socks/)
+
 trio-socks provides a trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server
 
 # Example 
@@ -21,4 +24,9 @@ async def print_public_ip():
 		await parse_public_ip(stream)
 
 trio.run(print_public_ip)
+```
+Output:
+```
+my_ip='132.202.81.51'
+my_ip='91.143.60.163'
 ```
