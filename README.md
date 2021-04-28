@@ -2,7 +2,7 @@
 [![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/tterb/atomic-design-ui/blob/master/LICENSEs)
 [![PyPi Version](https://img.shields.io/pypi/v/trio-socks.svg)](https://pypi.python.org/pypi/trio-socks/)
 
-trio-socks provides a trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server
+trio-socks is a simple trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server
 
 # Example 
 ```python
