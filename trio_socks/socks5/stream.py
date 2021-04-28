@@ -5,8 +5,6 @@ import ipaddress
 from typing import Tuple, Optional, Iterable
 from .error import ProtocolError, AuthError
 from . import packets
-from .. import log
-log = log.get_logger(__name__)
 
 def _determine_address_type(address):
 	try:
@@ -51,17 +49,13 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 				'password': self._password
 			})
 
-			log.debug(f'[{self._local_addr} -> {self._proxy[0]}] Sending auth request: {packets.ClientAuthRequest.parse(auth_request)}')
 			await self._stream.send_all(auth_request)
 
 			data = await self._stream.receive_some(max_bytes=packets.ServerAuthResponse.sizeof())
 			if data is None or len(data) == 0:
 				raise ProtocolError('Connection closed unexpectedly')
 
-			log.debug(f'[{self._local_addr} <- {self._proxy[0]}] Received packet: {data}')
-
 			auth_response = packets.ServerAuthResponse.parse(data)
-			log.debug(f'packet is auth response: {auth_response}')
 
 			if not auth_response.status:
 				raise AuthError('Authentication denied')
@@ -77,18 +71,15 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 			'auth_methods': auth_methods
 		})
 
-		log.debug(f'[{self._local_addr} -> {self._proxy[0]}] Sending client greeting: {packets.ClientGreeting.parse(greeting)}')
 		await self._stream.send_all(greeting)
 
 	async def _receive_server_choice(self):
 		data = await self._stream.receive_some(max_bytes=packets.ServerChoice.sizeof())
 		if data is None or len(data) == 0:
 			raise ProtocolError('Connection closed unexpectedly')
-		log.debug(f'[{self._local_addr} <- {self._proxy[0]}] Received packet: {data}')
 		return data
 
 	async def _send_connection_request(self, command, address: Tuple[str, int]):
-		log.debug(f'[_send_connection_request] {command=}, {address=}')
 		address_type = _determine_address_type(address[0])
 
 		connection_request = packets.ClientConnectionRequest.build({
@@ -99,7 +90,6 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 			)
 		})
 
-		log.debug(f'[{self._local_addr} -> {self._proxy[0]}] Sending client connection request: {packets.ClientConnectionRequest.parse(connection_request)}')
 		await self._stream.send_all(connection_request)
 
 	async def _receive_connection_response(self) -> packets.ServerConnectionResponse:
@@ -107,10 +97,7 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		if data is None or len(data) == 0:
 			raise ProtocolError('Connection closed unexpectedly')
 
-		log.debug(f'[{self._local_addr} <- {self._proxy[0]}] Received packet: {data}')
 		connection_response = packets.ServerConnectionResponse.parse(data)
-		log.debug(f'packet is connection response: {connection_response}')
-
 		if connection_response.status != packets.ServerAuthStatus.request_granted:
 			raise ProtocolError(f'Server denied connection request: {connection_response.status}')
 
@@ -136,7 +123,6 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 
 			packet = packets.ServerChoice.parse(data)
 			auth_choice = packet.auth_choice
-			log.debug(f'packet is server choice: {packet}')
 
 			await self._authenticate(auth_choice)
 			await self._send_connection_request(command, destination)
@@ -164,14 +150,11 @@ class Socks5Stream(trio.abc.HalfCloseableStream):
 		data = await self._stream.receive_some(max_bytes=max_bytes)
 		if data is None or len(data) == 0:
 			raise ProtocolError('Connection closed unexpectedly')
-		log.debug(f'[{self._local_addr} <- {self._proxy[0]} <- {self._destination[0]}] received: {data}')
 		return data
 
 	async def send_all(self, data):
 		await self._ensure_negotiated()
 		await self._stream.send_all(data)
-		log.debug(f'[{self._local_addr} -> {self._proxy[0]} -> {self._destination[0]}] sent: {data}')
-
 
 	async def wait_send_all_might_not_block(self):
 		await self._ensure_negotiated()
