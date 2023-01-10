@@ -1,7 +1,7 @@
-# trio-socks
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPi Version](https://img.shields.io/pypi/v/trio-socks.svg)](https://pypi.python.org/pypi/trio-socks/)
 
+# trio-socks
 trio-socks is a simple trio.abc.HalfCloseableStream that routes its traffic through a SOCKS proxy server
 
 # Example 
